@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
-"""make.fun entry for news-image-20261118.
+"""make.fun entry: one image summing up Wednesday 18 November 2026.
 
-The bounty asks for one image that sums up the world's news of Wednesday
-18 November 2026, written to /output/entry.png by a program that runs with no
-network access. The rules allow the simplest form of entry: a repository that
-holds the image plus a program that copies it to the output directory. That is
-exactly what this is, and nothing more is needed.
+The competition asks for a single image of the day's world news, produced by a
+program that runs offline. The rules name the simplest compliant shape outright:
+a repository that holds the image plus a program that copies it into the output
+directory. This is that program, and art/entry.png is that image.
 
     MAKEFUN_OUTPUT_DIR=out python3 main.py
 
-The image itself is art/entry.png, rendered at build time by
-art/render_image.py (Pillow, no network -- see art/README.md for the layout and
-the checks it passed before it was committed). Rendering never happens here, so
-this program is standard-library only, touches no socket, and writes
-byte-identical output on every run: copying the same file twice yields the same
-bytes, which is what the two-run reproducibility gate wants.
+Nothing is drawn here. art/render_image.py draws the page once, at build time,
+with Pillow; the result is committed. Copying a committed file is byte-identical
+across runs by definition, which is exactly what the two-run reproducibility
+check wants and is why the split exists at all.
 
-Guard rails, because a malformed image scores zero rather than badly:
-  * the file is re-checked against the gate's limits before it is copied --
-    at most 1 MiB, at most 1024x1024, and a real PNG by magic bytes;
-  * the copy is atomic, so a partial write can never be graded;
-  * every failure exits non-zero with a line saying what was wrong.
+A malformed image is not scored badly, it is scored zero, so the checks below run
+before anything is written:
 
-The output name is fixed by the competition: entry.png, whatever the format.
+  * the source is a real PNG (magic bytes) with a plausible IHDR;
+  * it is within the gate's limits, 1 MiB and 1024 px a side;
+  * the copy is atomic, so a truncated file can never be graded;
+  * the byte count of what landed is compared with the source.
+
+The output filename is fixed by the competition, not by this program.
 """
 
 from __future__ import annotations
@@ -32,87 +31,106 @@ import shutil
 import sys
 import tempfile
 
-# the rendered image, committed beside this file
-SOURCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "art", "entry.png")
+HERE = os.path.dirname(os.path.abspath(__file__))
+IMAGE = os.path.join(HERE, "art", "entry.png")
 
-# the competition names the file exactly; keep it even though the format is PNG
 OUTPUT_NAME = "entry.png"
+DEFAULT_OUT = "/output"
 
-DEFAULT_OUT_DIR = "/output"
-
-MAX_BYTES = 1048576          # the gate rejects anything larger
-MAX_SIDE = 1024              # and anything wider or taller than this
-PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+LIMIT_BYTES = 1024 * 1024
+LIMIT_SIDE = 1024
+PNG_SIG = b"\x89PNG\r\n\x1a\n"
 
 
-def fail(message):
-    """Say what went wrong and stop, rather than writing a file that fails the gate."""
-    print(f"error: {message}", file=sys.stderr)
+def abort(reason):
+    """Report and stop: a wrong file in the output dir is worse than no file."""
+    sys.stderr.write("error: %s\n" % reason)
     return 1
 
 
-def png_size(data):
-    """Read width and height out of the IHDR chunk, without trusting anything else."""
-    if len(data) < 24 or not data.startswith(PNG_MAGIC):
-        raise ValueError("not a PNG")
-    if data[12:16] != b"IHDR":
+def dimensions(head):
+    """Width and height from the IHDR chunk, with the structure actually checked."""
+    if not head.startswith(PNG_SIG):
+        raise ValueError("signature is not PNG")
+    if len(head) < 24:
+        raise ValueError("header is truncated")
+    if head[12:16] != b"IHDR":
         raise ValueError("first chunk is not IHDR")
-    return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")
+    width = int.from_bytes(head[16:20], "big")
+    height = int.from_bytes(head[20:24], "big")
+    if width == 0 or height == 0:
+        raise ValueError("header declares a zero side")
+    return width, height
 
 
-def check_output_dir(out_dir):
-    """The grader hands us a directory that exists; a typo should not make one."""
+def resolve_out_dir():
+    """Honour the grader's directory; never silently invent a different one."""
+    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", DEFAULT_OUT)
     if os.path.isdir(out_dir):
-        return None
+        return out_dir, None
     parent = os.path.dirname(os.path.abspath(out_dir)) or "/"
     if not os.path.isdir(parent):
-        return f"{out_dir} has no parent directory"
+        return None, "%s and its parent both missing" % out_dir
     try:
         os.makedirs(out_dir, exist_ok=True)
     except OSError as exc:
-        return f"cannot create {out_dir}: {exc}"
-    return None
+        return None, "cannot create %s (%s)" % (out_dir, exc)
+    return out_dir, None
 
 
 def main():
-    out_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", DEFAULT_OUT_DIR)
+    if not os.path.isfile(IMAGE):
+        return abort("image not found at %s" % IMAGE)
 
-    if not os.path.isfile(SOURCE):
-        return fail(f"the image is missing: {SOURCE}")
+    size = os.path.getsize(IMAGE)
+    if size > LIMIT_BYTES:
+        return abort("image is %d bytes, limit is %d" % (size, LIMIT_BYTES))
 
-    size = os.path.getsize(SOURCE)
-    if size > MAX_BYTES:
-        return fail(f"the image is {size} bytes, over the {MAX_BYTES}-byte limit")
-
-    with open(SOURCE, "rb") as fh:
+    with open(IMAGE, "rb") as fh:
         head = fh.read(24)
     try:
-        w, h = png_size(head)
+        width, height = dimensions(head)
     except ValueError as exc:
-        return fail(f"the image is not a usable PNG: {exc}")
-    if w > MAX_SIDE or h > MAX_SIDE:
-        return fail(f"the image is {w}x{h}, over the {MAX_SIDE}px limit")
+        return abort("image is unusable: %s" % exc)
+    if max(width, height) > LIMIT_SIDE:
+        return abort("image is %dx%d, limit is %d a side"
+                     % (width, height, LIMIT_SIDE))
 
-    problem = check_output_dir(out_dir)
+    out_dir, problem = resolve_out_dir()
     if problem:
-        return fail(problem)
-    dest = os.path.join(out_dir, OUTPUT_NAME)
+        return abort(problem)
 
-    # atomic: write beside the target, then rename over it, so the grader never
-    # sees a half-written file if the run is cut short
-    fd, tmp = tempfile.mkstemp(dir=out_dir, prefix=".entry-", suffix=".png")
-    os.close(fd)
+    target = os.path.join(out_dir, OUTPUT_NAME)
+    # write beside the target and rename over it: the grader either sees the
+    # whole file or no file, never a half-copied one
+    handle, scratch = tempfile.mkstemp(dir=out_dir, prefix=".entry-", suffix=".png")
+    os.close(handle)
     try:
-        shutil.copyfile(SOURCE, tmp)
-        os.replace(tmp, dest)
+        shutil.copyfile(IMAGE, scratch)
+        os.replace(scratch, target)
     except OSError as exc:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-        return fail(f"could not write {dest}: {exc}")
+        if os.path.exists(scratch):
+            os.unlink(scratch)
+        return abort("could not write %s (%s)" % (target, exc))
 
-    written = os.path.getsize(dest)
-    print(f"wrote {dest} ({written} bytes, {w}x{h})")
-    return 0 if written == size else fail(f"{dest} is {written} bytes, expected {size}")
+    written = os.path.getsize(target)
+    if written != size:
+        return abort("%s holds %d bytes, expected %d" % (target, written, size))
+
+    # the second half of the reproducibility check: the file that landed must
+    # still declare the same geometry the source did
+    with open(target, "rb") as fh:
+        landed = fh.read(24)
+    try:
+        w2, h2 = dimensions(landed)
+    except ValueError as exc:
+        return abort("the copy came out unreadable: %s" % exc)
+    if (w2, h2) != (width, height):
+        return abort("the copy is %dx%d, the source was %dx%d"
+                     % (w2, h2, width, height))
+
+    print("wrote %s: %d bytes, %dx%d" % (target, written, width, height))
+    return 0
 
 
 if __name__ == "__main__":
