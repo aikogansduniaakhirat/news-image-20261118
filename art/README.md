@@ -12,9 +12,9 @@ deterministic.
 | band | content |
 | --- | --- |
 | masthead | "18 NOVEMBER 2026", the day, and a one-line summary |
-| map | equirectangular land outline, six pins placed at each story's country |
+| map | equirectangular land outline, six numbered pins and four unnumbered dots |
 | stories | two columns of three cards: region label, headline, one-line detail |
-| footer | "also that day" — seven further items in two columns |
+| footer | "also that day" — six further items in two columns |
 
 Pins are keyed to the story numbers in the cards, so the map reads top to bottom
 with the page. Positions are country centroids, not cities, because most stories

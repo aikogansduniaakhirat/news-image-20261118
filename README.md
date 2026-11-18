@@ -12,24 +12,23 @@ news.
 
 **The day, in six stories**
 
-1. **Shenzhen opens APEC** — twenty-one economies gather for the leaders' meeting;
-   Xi hosts Trump and Putin on Thursday.
-2. **Iran strikes Bahrain** — a third drone raid on the kingdom in five days;
-   Bahrain issues an all-clear at dawn on the 18th.
-3. **Nvidia lifts Seoul** — a $115.8bn quarter, roughly double last year's, sends
-   Korean stocks sharply higher at the open; the board rules out Huang's return.
-4. **COP31 deal under fire** — an 18-page draft cover decision in Antalya asks for
-   35% electricity in global energy use by 2035 and splits the negotiators.
-5. **Ebola shots advance** — the WHO says two vaccine candidates enter phase 2
-   trials next week in DR Congo.
-6. **Haiti backs Bukele** — thousands march for El Salvador's anti-gang mission as
-   gang violence blocks aid and child malnutrition worsens.
+1. **US strikes Qeshm** — after Iran's Guards hit Bahrain again; Manama issues
+   an all-clear at dawn on the 18th.
+2. **Nvidia lifts Seoul** — revenue doubles, the board rules out Huang's return,
+   and Korean stocks open sharply higher.
+3. **Outages hit the web** — BBC, IKEA and Air France go down as Trump calls the
+   string of failures "fine"; the NSA loses a classified network.
+4. **Measles status lost** — the US, Mexico and Bolivia lose elimination after
+   nearly three decades.
+5. **UK targets settlers** — eight firms building West Bank settlements are
+   sanctioned in a push to protect the two-state solution.
+6. **Haiti backs Bukele** — thousands march for El Salvador's anti-gang mission
+   as analysts warn of escalation.
 
-**Also that day**, along the bottom: an An-12 crash in Siberia kills all 19 aboard;
-garment workers in Dhaka clash with police and block highways; Iraq restarts the
-Ceyhan pipeline after twelve years; Congress agrees a civilian plane-locator
-mandate; California bans Waymo from freeways; the UK sanctions eight companies
-building West Bank settlements.
+**Also that day**, along the bottom: a Russian An-12 crashes in Siberia, killing
+19; Trump asks for $50bn to overhaul US aviation; Congress agrees a civilian
+plane-locator mandate; California bans Waymo from freeways; the Knesset gets a
+new speaker from the Eisenkot bloc; and Lee Jae Myung reaches Shenzhen for APEC.
 
 ## How it is made
 

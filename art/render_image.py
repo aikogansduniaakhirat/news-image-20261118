@@ -59,37 +59,38 @@ SUBHEAD_R = "SIX STORIES  -  SIX REGIONS"
 # field, number, headline (one line), detail (<=2 lines), (lon, lat)
 # Every story here happened, or was first reported, on 18 November 2026.
 STORIES = [
-    ("ASIA-PACIFIC  -  DIPLOMACY", "1", "SHENZHEN OPENS APEC",
-     "Twenty-one economies gather; Xi hosts Trump and Putin on Thursday",
-     (114.06, 22.55)),
-    ("MIDDLE EAST  -  CONFLICT", "2", "IRAN STRIKES BAHRAIN",
-     "A third drone raid in five days; Bahrain clears its alert at dawn",
+    ("MIDDLE EAST  -  CONFLICT", "1", "US STRIKES QESHM",
+     "Iran's Guards hit Bahrain again; Manama clears its alert at dawn",
      (50.58, 26.22)),
-    ("MARKETS  -  TECHNOLOGY", "3", "NVIDIA LIFTS SEOUL",
-     "A $115.8bn quarter, twice last year's; its board bars Huang's return",
+    ("MARKETS  -  TECHNOLOGY", "2", "NVIDIA LIFTS SEOUL",
+     "Revenue doubles, the board bars Huang's return, Seoul jumps",
      (126.98, 37.57)),
-    ("EUROPE  -  CLIMATE", "4", "COP31 DEAL UNDER FIRE",
-     "An 18-page cover decision asks 35% electricity by 2035 in Antalya",
-     (30.70, 36.90)),
-    ("AFRICA  -  HEALTH", "5", "EBOLA SHOTS ADVANCE",
-     "Two vaccine candidates start next week as DR Congo's cases double",
-     (15.31, -4.32)),
+    ("CYBER  -  SECURITY", "3", "OUTAGES HIT THE WEB",
+     "BBC, IKEA and Air France go down; the NSA loses a network",
+     (-98.00, 39.00)),
+    ("AMERICAS  -  HEALTH", "4", "MEASLES STATUS LOST",
+     "The US, Mexico and Bolivia lose elimination after decades",
+     (-102.00, 23.00)),
+    ("EUROPE  -  SANCTIONS", "5", "UK TARGETS SETTLERS",
+     "Eight firms building West Bank settlements are sanctioned",
+     (-1.50, 52.50)),
     ("CARIBBEAN  -  SECURITY", "6", "HAITI BACKS BUKELE",
-     "Thousands back El Salvador's anti-gang troops as aid is blocked",
+     "Thousands march for Salvadoran troops as gang violence rises",
      (-72.34, 18.54)),
 ]
 
 # the day's other stories, one dot each, in the same order as ALSO
-MINOR = [(86.10, 55.40), (90.40, 23.80), (44.40, 33.30),
-         (-77.00, 38.90), (-119.40, 36.80), (-0.13, 51.50)]
+# The unnumbered dots mark other places the day touched. Nothing here may sit
+# within PIN_R + 8px of a numbered pin, or under the footer's legend colour.
+MINOR = [(86.10, 55.40), (90.40, 23.80), (44.40, 33.30), (37.50, 55.70)]
 
 ALSO_HEAD = "ALSO ON 18 NOVEMBER"
-ALSO = ["An-12 crash in Siberia kills all 19 aboard",
-        "Dhaka garment protests shut 37 factories",
-        "Iraq restarts Turkish pipeline after 12 years",
-        "Congress backs plane locator mandate",
+ALSO = ["Russian An-12 crash in Siberia kills 19",
+        "Trump seeks $50bn for aviation overhaul",
+        "Congress backs a plane locator mandate",
         "California bans Waymo from freeways",
-        "UK sanctions eight settlement firms"]
+        "Knesset speaker replaced by Eisenkot bloc",
+        "Lee arrives in Shenzhen for APEC"]
 
 
 def font(size, bold=False):
