@@ -1,13 +1,17 @@
-"""Measure a candidate front-page PNG against the things the brief cares about.
+"""Measure a candidate front-page PNG against what the brief actually asks for.
 
-No vision model is reachable while this entry is built, so the image is checked
-by counting pixels instead of by looking at it. Everything here is a question
-with a defensible answer:
+No vision model is reachable while this entry is built, so the image is judged
+here by counting pixels rather than by looking at it. Each question has a
+defensible answer:
 
-  * is the date actually the biggest thing on the page (ink in the top band)?
-  * does the map frame hold land, and does land sit where geography says it does?
-  * is there a red pin at each story's projected centre?
-  * does the page still hold together after the 300 px downscale the judge uses?
+  1. is the date really the heaviest thing on the sheet?
+  2. does the map frame hold land, and is land where geography puts it?
+  3. is there a red pin at every story's projected centre?
+  4. does the page survive the 300 px downscale the judge reads it at?
+
+Thresholds are compared in the same unit the helper returns — a fraction against
+a fraction. Mixing a fraction with a percentage is how a checker starts reporting
+that a dense masthead is empty.
 
     python art/check_image.py art/entry.png
 """
@@ -19,13 +23,15 @@ import sys
 
 from PIL import Image
 
-# kept in step with render_image.py by importing it, so a palette change here
-# cannot silently disagree with what was drawn
+# Take the palette and the projection from the renderer rather than retyping
+# them: a checker holding its own copy of the colours goes stale the moment the
+# palette moves, and then argues with an image it drew itself.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import render_image as R  # noqa: E402
 
-JUDGE_SIDE = 300          # the size the brief says the picture is read at
-DARK = 118                # mean channel below this counts as ink
+JUDGE_SIDE = 300        # the size the picture is read at
+INK = 118               # mean channel below this counts as ink
+HOOD = 2                # +/- pixels sampled per geography probe
 
 
 def mean(pixel):
@@ -37,36 +43,37 @@ def near(pixel, colour, slack=26):
 
 
 def ink_share(image, box):
+    """Fraction of dark pixels in a box, in 0..1."""
     crop = image.crop(box).convert("RGB")
     pixels = list(crop.getdata())
-    dark = sum(1 for p in pixels if mean(p) < DARK)
-    return dark / max(1, len(pixels))
+    return sum(1 for p in pixels if mean(p) < INK) / max(1, len(pixels))
 
 
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "art/entry.png"
     image = Image.open(path).convert("RGB")
+    width, height = image.size
+    size = os.path.getsize(path)
     faults = []
-    print("file %s: %dx%d, %d bytes"
-          % (path, image.size[0], image.size[1], os.path.getsize(path)))
 
-    if image.size != (1024, 1024):
+    print("file %s: %dx%d, %d bytes" % (path, width, height, size))
+    if (width, height) != (1024, 1024):
         faults.append("not 1024x1024")
-    if os.path.getsize(path) > 1048576:
+    if size > 1048576:
         faults.append("over 1 MiB")
 
-    # 1. the date must dominate the top band, or the picture could be any day
-    top = ink_share(image, (0, 0, 1024, 300))
-    body = ink_share(image, (0, 300, 1024, 900))
+    # 1. the date has to dominate the top band, or the page could be any day
+    top = ink_share(image, (0, 0, width, 300))
+    body = ink_share(image, (0, 300, width, 900))
     print("ink: masthead band %.1f%%, body %.1f%%" % (top * 100, body * 100))
     if top < 0.06:
         faults.append("masthead band looks empty (%.1f%% ink)" % (top * 100))
     if top <= body:
         faults.append("date band is not the densest part of the page")
 
-    # 2. the map frame must be mostly drawn land + sea, not blank paper
-    g = R.geometry()
-    fl, ft, fr, fb = [v / R.SS for v in g["frame"]]
+    # 2. the map frame must be drawing, not blank paper
+    plan = R.layout()
+    fl, ft, fr, fb = [v / R.SS for v in plan["frame"]]
     frame_box = (int(fl), int(ft), int(fr), int(fb))
     crop = image.crop(frame_box).convert("RGB")
     total = crop.size[0] * crop.size[1]
@@ -80,67 +87,70 @@ def main():
     if (land + sea) / total < 0.85:
         faults.append("map frame is not filled by the drawing")
 
-    # 3. geography spot check: coordinates whose answer is not in doubt.
-    # Sample the 5x5 neighbourhood rather than one pixel: at 1024 px a graticule
-    # hairline or a marker halo can land exactly on a single coordinate, and one
-    # pixel proving nothing is how a checker starts reporting false alarms.
-    def sample(lon, lat):
+    # 3. geography, at coordinates whose answer is not in doubt. Sample a
+    #    neighbourhood and take the majority: a graticule hairline or a marker
+    #    halo can sit exactly on a single pixel and prove nothing.
+    def classify(lon, lat):
         x, y = R.place(lon, lat, (fl, ft, fr, fb))
         x, y = int(x), int(y)
-        counts = {"land": 0, "sea": 0, "other": 0}
-        for dx in range(-2, 3):
-            for dy in range(-2, 3):
-                pixel = image.getpixel((min(1023, max(0, x + dx)),
-                                        min(1023, max(0, y + dy))))
+        tally = {"land": 0, "sea": 0, "other": 0}
+        for dx in range(-HOOD, HOOD + 1):
+            for dy in range(-HOOD, HOOD + 1):
+                pixel = image.getpixel((min(width - 1, max(0, x + dx)),
+                                        min(height - 1, max(0, y + dy))))
                 if near(pixel, R.GEO, 30):
-                    counts["land"] += 1
+                    tally["land"] += 1
                 elif near(pixel, R.SEA, 26):
-                    counts["sea"] += 1
+                    tally["sea"] += 1
                 else:
-                    counts["other"] += 1
-        return max(counts, key=counts.get), counts
+                    tally["other"] += 1
+        return max(tally, key=tally.get), tally
 
     for name, lon, lat, want in [
         ("Sahara", 10.0, 22.0, "land"), ("Siberia", 100.0, 62.0, "land"),
         ("Kansas", -98.0, 38.5, "land"), ("Amazon", -68.0, -8.0, "land"),
         ("Alice Springs", 133.8, -23.7, "land"), ("Congo", 22.0, -2.0, "land"),
         ("Atlantic", -35.0, 10.0, "sea"), ("Pacific", -150.0, -8.0, "sea"),
-        ("Indian Ocean", 75.0, -20.0, "sea"), ("Bay of Bengal", 88.0, 14.0, "sea"),
+        ("Indian Ocean", 75.0, -20.0, "sea"),
+        ("Bay of Bengal", 88.0, 14.0, "sea"),
     ]:
-        got, counts = sample(lon, lat)
+        got, tally = classify(lon, lat)
         ok = got == want
-        print("  %-14s %-6s -> %-6s %s  %s"
-              % (name, want, got, "ok" if ok else "MISMATCH", counts))
+        print("  %-14s %-5s -> %-5s %-8s %s"
+              % (name, want, got, "ok" if ok else "MISMATCH", tally))
         if not ok:
-            faults.append("geography mismatch at %s (%s, wanted %s)" % (name, got, want))
+            faults.append("geography mismatch at %s (%s, wanted %s)"
+                          % (name, got, want))
 
-    # 4. a pin within a pin radius of every story's projected centre
-    radius = int(R.PIN_R)
-    for _field, number, _headline, _detail, (lon, lat) in R.CARDS:
-        x, y = R.place(lon, lat, (fl, ft, fr, fb))
-        found = False
-        for dx in range(-radius, radius + 1):
-            for dy in range(-radius, radius + 1):
-                if near(image.getpixel((int(x) + dx, int(y) + dy)), R.RED, 40):
-                    found = True
-                    break
-            if found:
-                break
-        print("  pin %s at (%.0f,%.0f): %s" % (number, x, y, "red found" if found else "MISSING"))
+    # 4. a red pin within a pin radius of each story's projected centre
+    reach = int(R.PIN_R)
+    for story in R.STORIES:
+        x, y = R.place(story.lon, story.lat, (fl, ft, fr, fb))
+        x, y = int(x), int(y)
+        found = any(
+            near(image.getpixel((min(width - 1, max(0, x + dx)),
+                                 min(height - 1, max(0, y + dy)))), R.RED, 40)
+            for dx in range(-reach, reach + 1)
+            for dy in range(-reach, reach + 1)
+        )
+        print("  pin %s at (%d,%d): %s"
+              % (story.number, x, y, "red found" if found else "MISSING"))
         if not found:
-            faults.append("no pin drawn for story %s" % number)
+            faults.append("no pin drawn for story %s" % story.number)
 
-    # 5. the judge reads a thumbnail: contrast has to survive a 300 px downscale
-    thumb = image.resize((JUDGE_SIDE, JUDGE_SIDE), Image.LANCZOS)
-    values = sorted(mean(p) for p in thumb.convert("RGB").getdata())
-    dark_frac = sum(1 for v in values if v < DARK) / len(values)
-    lo, hi = values[int(0.02 * len(values))], values[int(0.98 * len(values))]
+    # 5. the judge reads a thumbnail — contrast has to survive the downscale
+    thumb = image.resize((JUDGE_SIDE, JUDGE_SIDE), Image.LANCZOS).convert("RGB")
+    values = sorted(mean(p) for p in thumb.getdata())
+    dark = sum(1 for v in values if v < INK) / len(values)
+    lo = values[int(0.02 * len(values))]
+    hi = values[int(0.98 * len(values))]
     print("at %d px: ink %.1f%%, 2-98%% range %.0f..%.0f (spread %.0f)"
-          % (JUDGE_SIDE, dark_frac * 100, lo, hi, hi - lo))
+          % (JUDGE_SIDE, dark * 100, lo, hi, hi - lo))
     if hi - lo < 120:
         faults.append("thumbnail contrast collapses at %d px" % JUDGE_SIDE)
-    if not 0.02 < dark_frac < 0.45:
-        faults.append("thumbnail reads as %s" % ("blank" if dark_frac <= 0.02 else "mud"))
+    if not 0.02 < dark < 0.45:
+        faults.append("thumbnail reads as %s"
+                      % ("blank" if dark <= 0.02 else "mud"))
 
     print("faults:", faults or "none")
     return 1 if faults else 0
